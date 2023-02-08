@@ -4,7 +4,9 @@ using System.Data;
 using System.Data.SQLite;
 using System.IO;
 using System.Linq;
+using System.Management;
 using System.Windows.Forms;
+
 
 
 
@@ -22,7 +24,7 @@ namespace Disc_Catalog
 
         }
 
-        public int index=0;
+        public int index = 0;
         public int allnodes = 0;
         public int labelA = 0;
         public ulong i = 0;
@@ -31,7 +33,9 @@ namespace Disc_Catalog
         public string dataurl;
         List<FolderInfo> flder = new List<FolderInfo>();
         List<FileInfo> filnfo = new List<FileInfo>();
-        List<string> labelnfo = new List<string>();
+        List<FolderInfo> TempInfo = new List<FolderInfo>();
+        List<FileInfo> TempFile = new List<FileInfo>();
+        List<LabelInfo> labels = new List<LabelInfo>();
 
 
         private void listall(string tmp, string rootF)
@@ -48,30 +52,39 @@ namespace Disc_Catalog
             //int size=a.GetDirectories().Count();
             foreach (DirectoryInfo d in a.GetDirectories())
             {
+
+
                 //if (i==1)
                 //{
                 var cmd = new SQLiteCommand(con);
-                cmd.CommandText = "INSERT INTO FolderInfo(`id`, `name`, `parent`, `labelinfo`) VALUES(@id, @name, @parent, @labelinfo)";
+                cmd.CommandText = "INSERT INTO FolderInfo(`id`, `name`, `parent`, `labelinfo`, `size`, `description`, `attr`, `crtdate`, `mdfdate`, `fullpath`)VALUES(@id, @name, @parent, @labelinfo, @size, @description, @attr, @crtdate, @mdfdate, @fullpath)";
                 cmd.Parameters.AddWithValue("@id", i);
                 cmd.Parameters.AddWithValue("@name", d.Name);
                 cmd.Parameters.AddWithValue("@parent", rootF);
                 cmd.Parameters.AddWithValue("@labelinfo", "disclabel" + labelA);
+                cmd.Parameters.AddWithValue("@size", 0);
+                cmd.Parameters.AddWithValue("@description", "");
+                cmd.Parameters.AddWithValue("@attr", "Mappa");
+                cmd.Parameters.AddWithValue("@crtdate", d.CreationTime);
+                cmd.Parameters.AddWithValue("@mdfdate", d.LastWriteTime);
+                cmd.Parameters.AddWithValue("@fullpath", d.FullName);
+
 
                 cmd.ExecuteNonQuery();
-                flder.Add(new FolderInfo(i.ToString(), d.Name, rootF, i, "disclabel"+labelA));
+                flder.Add(new FolderInfo(i.ToString(), d.Name, rootF, i, "disclabel" + labelA, 0, "", "Mappa", d.CreationTime.ToString(), d.LastWriteTime.ToString(), d.FullName));
                 Console.WriteLine(flder[Convert.ToInt32(i)].Id());
-                
+
                 TreeNode[] tempnode = treeView1.Nodes.Find(rootF, true);
                 //Console.WriteLine("ez: "+tempnode[0].Nodes.Count);
 
-                    tempnode[0].Nodes.Add(i.ToString(), d.Name);
-                    //treeView1.Nodes.Add(i.ToString(), d.Name);
-                     //selected = i.ToString();
-                    //treeView1.SelectedNode=(TreeNodeCollection)treeView1.Nodes.Count;
-                    i++;
+                tempnode[0].Nodes.Add(i.ToString(), d.Name);
+                //treeView1.Nodes.Add(i.ToString(), d.Name);
+                //selected = i.ToString();
+                //treeView1.SelectedNode=(TreeNodeCollection)treeView1.Nodes.Count;
+                i++;
                 //if(d.)
                 ulong tp = i - 1;
-                  listall(tmp + d.Name + "\\", tp.ToString());
+                listall(tmp + d.Name + "\\", tp.ToString());
                 //}
                 /* else
                  {
@@ -86,23 +99,47 @@ namespace Disc_Catalog
 
             foreach (var fi in a.GetFiles())
             {
+
+                Console.WriteLine(fi.CreationTime);
                 var cmd2 = new SQLiteCommand(con2);
-                cmd2.CommandText = "INSERT INTO FileInfo(`id`, `name`, `parent`, `labelinfo`) VALUES(@id, @name, @parent, @labelinfo)";
+                cmd2.CommandText = "INSERT INTO FileInfo(`id`, `name`, `parent`, `labelinfo`, `size`, `description`, `attr`, `crtdate`, `mdfdate`, `fullpath`)VALUES(@id, @name, @parent, @labelinfo, @size, @description, @attr, @crtdate, @mdfdate, @fullpath)";
                 cmd2.Parameters.AddWithValue("@id", fileIndex);
                 cmd2.Parameters.AddWithValue("@name", fi.Name);
                 cmd2.Parameters.AddWithValue("@parent", rootF);
                 cmd2.Parameters.AddWithValue("@labelinfo", "disclabel" + labelA);
+                cmd2.Parameters.AddWithValue("@size", fi.Length);
+                cmd2.Parameters.AddWithValue("@description", "");
+                cmd2.Parameters.AddWithValue("@attr", fi.Extension);
+                cmd2.Parameters.AddWithValue("@crtdate", fi.CreationTime);
+                cmd2.Parameters.AddWithValue("@mdfdate", fi.LastWriteTime);
+                cmd2.Parameters.AddWithValue("@fullpath", fi.FullName);
 
                 cmd2.ExecuteNonQuery();
 
-                filnfo.Add(new FileInfo("file" + fileIndex.ToString(), fi.Name, rootF, fileIndex, "disclabel" + labelA));
+                filnfo.Add(new FileInfo("file" + fileIndex.ToString(), fi.Name, rootF, fileIndex, "disclabel" + labelA, fi.Length, "", fi.Extension, fi.CreationTime.ToString(), fi.LastWriteTime.ToString(), fi.FullName));
                 TreeNode[] tempnode = treeView1.Nodes.Find(rootF, true);
-                tempnode[0].Nodes.Add("file"+fileIndex.ToString(), fi.Name);
+                tempnode[0].Nodes.Add("file" + fileIndex.ToString(), fi.Name);
                 fileIndex++;
 
             }
-                con.Close();
-                con2.Close();
+            con.Close();
+            con2.Close();
+        }
+
+        void driveInsertEvent(object sender, EventArrivedEventArgs e)
+        {
+            // Get the Event object and display it
+            PropertyData pd = e.NewEvent.Properties["TargetInstance"];
+
+            if (pd != null)
+            {
+                ManagementBaseObject mbo = pd.Value as ManagementBaseObject;
+                // if CD removed VolumeName == null
+                if (mbo.Properties["VolumeName"].Value != null)
+                {
+                    Console.WriteLine("valtozik");
+                }
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -111,6 +148,7 @@ namespace Disc_Catalog
             var con = new SQLiteConnection("Data Source=database.db");
             con.Open();
             var cmd = new SQLiteCommand(con);
+            drive();
             cmd.CommandText = "INSERT INTO LabelInfo(`id`, `labelnum`, `labelname`, `labelkey`) VALUES(@id, @labelnum, @labelname, @labelkey)";
             cmd.Parameters.AddWithValue("@id", labelA);
             cmd.Parameters.AddWithValue("@labelnum", labelA);
@@ -119,21 +157,76 @@ namespace Disc_Catalog
 
             cmd.ExecuteNonQuery();
             con.Close();
-            labelnfo.Add("disclabel" + labelA);
-            treeView1.Nodes.Add("disclabel"+labelA, textBox1.Text);
+           
+            treeView1.Nodes.Add("disclabel" + labelA, textBox1.Text);
 
             selected = "disclabel" + labelA;
 
             listall(comboBox1.Items[index].ToString(), selected);
-           
+
             allnodes++;
+
+            
+           
+
+
         }
 
+        public void drive(){
+                        SelectQuery query =
+    new SelectQuery("select * from win32_logicaldisk where drivetype=5");
+        ManagementObjectSearcher searcher =
+            new ManagementObjectSearcher(query);
+
+            foreach (ManagementObject mo in searcher.Get())
+            {
+                // If both properties are null I suppose there's no CD
+                if ((mo["volumename"] != null) || (mo["volumeserialnumber"] != null))
+                {
+                    Console.WriteLine("CD is named: {0}", mo["volumename"]);
+                    Console.WriteLine("CD Serial Number: {0}", mo["volumeserialnumber"]);
+                    Console.WriteLine("CD filesystem: {0}", mo["FileSystem"]);
+                    Console.WriteLine("CD mediatype: {0}", Convert.ToString(mo["MediaType"]));
+                    Console.WriteLine("CD size: {0}", mo["Size"]);
+                    string vname = mo["volumename"].ToString();
+                    string dsize = mo["Size"].ToString();
+                    long tsize = Convert.ToInt64(dsize);
+                    string serial = mo["volumeserialnumber"].ToString();
+                    string fs = mo["FileSystem"].ToString();
+                    Console.WriteLine(dsize);
+                    labels.Add(new LabelInfo("disclabel" + labelA, 
+                     labelA, textBox1.Text, vname,
+                     comboBox1.Text, tsize, textBox27.Text,
+                     serial,
+                     dtype(tsize), fs));
+                }
+                else
+                {
+                    Console.WriteLine("No CD in Unit");
+                }
+            }
+            }
+
+
+
         public string[] input;
+
+        
+        public string dtype(long dsize)
+        {
+           
+            return "s";
+        }
+
+
         private void Form1_Load(object sender, EventArgs e)
         {
             //Console.WriteLine("ez: "+ AppContext.BaseDirectory);
-            
+
+           
+
+
+
             if (!File.Exists("options.ini"))
             {
                 using (StreamWriter sw = new StreamWriter("options.ini"))
@@ -181,7 +274,7 @@ namespace Disc_Catalog
                     while (reader.Read())
                     {
 
-                        flder.Add(new FolderInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3)));
+                        flder.Add(new FolderInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                         TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -198,7 +291,7 @@ namespace Disc_Catalog
                     while (reader.Read())
                     {
 
-                        filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3)));
+                        filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                         TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -227,7 +320,9 @@ namespace Disc_Catalog
 
         private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            listBox1.Items.Clear();
+            TempInfo.Clear();
+            TempFile.Clear();
+            listView1.Items.Clear();
             string selectedNodeText = e.Node.Name;
             int selectedindex = (treeView1.SelectedNode.Index + 1);
             Console.WriteLine("selec: "+selectedNodeText+"index:");
@@ -245,7 +340,13 @@ namespace Disc_Catalog
 
                         if (selectedNodeText.Equals(tmpfolder2.Parent()))
                         {
-                            listBox1.Items.Add(tmpfolder2.Name());
+                            TempInfo.Add(tmpfolder2);
+                            ListViewItem ls = new ListViewItem(tmpfolder2.Name());
+                            ls.SubItems.Add("ez");
+                            ls.SubItems.Add(tmpfolder2.Size().ToString());
+                            ls.SubItems.Add(tmpfolder2.Attr());
+                            ls.SubItems.Add(tmpfolder2.Mdfdate());
+                            listView1.Items.Add(ls);
                             //Console.WriteLine("oke: "+ selectedNodeText+" masik: "+ tmpfolder2.Parent());
                         }
                         else
@@ -260,7 +361,13 @@ namespace Disc_Catalog
 
                         if (selectedNodeText.Equals(tmpfile2.Parent()))
                         {
-                            listBox1.Items.Add(tmpfile2.Name());
+                            TempFile.Add(tmpfile2);
+                            ListViewItem ls= new ListViewItem(tmpfile2.Name());
+                            ls.SubItems.Add("ez");
+                            ls.SubItems.Add(sizecalculate(tmpfile2.Size()));
+                            ls.SubItems.Add(tmpfile2.Attr());
+                            ls.SubItems.Add(tmpfile2.Mdfdate());
+                            listView1.Items.Add(ls);
                             //Console.WriteLine("oke: "+ selectedNodeText+" masik: "+ tmpfolder2.Parent());
                         }
                         else
@@ -300,7 +407,36 @@ namespace Disc_Catalog
             }*/
 
 
+
+
             }
+
+        private string sizecalculate(long size)
+        {
+            if (size < 1024)
+            {
+                return size.ToString() + "b";
+            }
+            else if (size > 1024 && size<1024*1024)
+            {
+                return Math.Round(size / Math.Pow(1024, 1), 2).ToString()+"kb";
+            }else if (size> Math.Pow(1024, 2) && size< Math.Pow(1024, 3))
+            {
+                return Math.Round(size / Math.Pow(1024, 2),2).ToString() + "mb";
+            }
+            else if (size > Math.Pow(1024, 3) && size < Math.Pow(1024,4))
+            {
+                return Math.Round(size / Math.Pow(1024, 3),2).ToString() + "Gb";
+            }
+            else if (size > Math.Pow(1024, 4) && size < Math.Pow(1024, 5))
+            {
+                return Math.Round(size / Math.Pow(1024, 4),2).ToString() + "Tb";
+            }
+            else
+            {
+                return size.ToString() + "b";
+            }
+        }
 
         private void megnyitásToolStripMenuItem_Click(object sender, EventArgs e)
         {
@@ -347,7 +483,7 @@ namespace Disc_Catalog
                 while (reader.Read())
                 {
 
-                    flder.Add(new FolderInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3)));
+                    flder.Add(new FolderInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                     TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -364,7 +500,7 @@ namespace Disc_Catalog
                 while (reader.Read())
                 {
 
-                    filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3)));
+                    filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                     TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -385,10 +521,10 @@ namespace Disc_Catalog
             con.Open();
             var cmd = new SQLiteCommand(con);
             cmd.CommandText = @"CREATE TABLE FolderInfo(id BIGINT [UNSIGNED] PRIMARY KEY,
-            name TEXT, parent TEXT, labelinfo TEXT)";
+            name TEXT, parent TEXT, labelinfo TEXT, size BIGINT, description TEXT, attr TEXT, crtdate TEXT, mdfdate TEXT, fullpath TEXT)";
             cmd.ExecuteNonQuery();
             cmd.CommandText = @"CREATE TABLE FileInfo(id BIGINT [UNSIGNED] PRIMARY KEY,
-            name TEXT, parent TEXT, labelinfo TEXT)";
+            name TEXT, parent TEXT, labelinfo TEXT, size BIGINT, description TEXT, attr TEXT, crtdate TEXT, mdfdate TEXT, fullpath TEXT)";
             cmd.ExecuteNonQuery();
             cmd.CommandText = @"CREATE TABLE LabelInfo(id INT PRIMARY KEY,
             labelnum TEXT, labelname TEXT, labelkey TEXT)";
@@ -416,6 +552,38 @@ namespace Disc_Catalog
         }
 
         private void treeView2_AfterSelect(object sender, TreeViewEventArgs e)
+        {
+
+        }
+
+        private void listView1_SelectedIndexChanged(object sender, EventArgs e)
+
+        {
+
+            if (listView1.SelectedItems.Count != 0 && TempInfo.Count()!=0 )
+            {
+               
+                textBox3.Text = TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Name();
+                textBox5.Text = TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Attr();
+                textBox7.Text = sizecalculate (TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Size());
+                textBox9.Text = TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Fullpath();
+                textBox11.Text = TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Crtdate();
+                textBox13.Text = TempInfo[listView1.Items.IndexOf(listView1.SelectedItems[0])].Crtdate();
+            }
+            else if (listView1.SelectedItems.Count != 0 && TempFile.Count() != 0 )
+            {
+
+                textBox3.Text = TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0])-TempInfo.Count()].Name();
+                textBox5.Text = TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0]) - TempInfo.Count()].Attr();
+                textBox7.Text = sizecalculate(TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0])].Size());
+                textBox9.Text = TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0])].Fullpath();
+                textBox11.Text = TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0])].Crtdate();
+                textBox13.Text = TempFile[listView1.Items.IndexOf(listView1.SelectedItems[0])].Crtdate();
+            }
+
+        }
+
+        private void textBox2_TextChanged(object sender, EventArgs e)
         {
 
         }
