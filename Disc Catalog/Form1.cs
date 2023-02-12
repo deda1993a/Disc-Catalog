@@ -214,7 +214,10 @@ namespace Disc_Catalog
         
         public string dtype(long dsize)
         {
-           
+            if (dsize > 800 * Math.Pow(1024, 2))
+            {
+                return "Dvd";
+            }
             return "s";
         }
 
