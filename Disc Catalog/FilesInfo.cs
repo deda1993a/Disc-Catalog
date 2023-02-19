@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Disc_Catalog
 {
-    class FileInfo
+    class FilesInfo
     {
         private string key;
         private ulong id;
@@ -22,7 +22,7 @@ namespace Disc_Catalog
         private string fullpath;
 
 
-        public FileInfo(string key, string name, string parent, ulong id, string labelInfo,
+        public FilesInfo(string key, string name, string parent, ulong id, string labelInfo,
             long size, string description, string attr, string crtdate,
             string mdfdate, string fullpath)
         {

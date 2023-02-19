@@ -32,9 +32,9 @@ namespace Disc_Catalog
         public string selected;
         public string dataurl;
         List<FolderInfo> flder = new List<FolderInfo>();
-        List<FileInfo> filnfo = new List<FileInfo>();
+        List<FilesInfo> filnfo = new List<FilesInfo>();
         List<FolderInfo> TempInfo = new List<FolderInfo>();
-        List<FileInfo> TempFile = new List<FileInfo>();
+        List<FilesInfo> TempFile = new List<FilesInfo>();
         List<LabelInfo> labels = new List<LabelInfo>();
 
 
@@ -62,7 +62,7 @@ namespace Disc_Catalog
                 cmd.Parameters.AddWithValue("@name", d.Name);
                 cmd.Parameters.AddWithValue("@parent", rootF);
                 cmd.Parameters.AddWithValue("@labelinfo", "disclabel" + labelA);
-                cmd.Parameters.AddWithValue("@size", 0);
+                cmd.Parameters.AddWithValue("@size", DirSize(d));
                 cmd.Parameters.AddWithValue("@description", "");
                 cmd.Parameters.AddWithValue("@attr", "Mappa");
                 cmd.Parameters.AddWithValue("@crtdate", d.CreationTime);
@@ -71,7 +71,7 @@ namespace Disc_Catalog
 
 
                 cmd.ExecuteNonQuery();
-                flder.Add(new FolderInfo(i.ToString(), d.Name, rootF, i, "disclabel" + labelA, 0, "", "Mappa", d.CreationTime.ToString(), d.LastWriteTime.ToString(), d.FullName));
+                flder.Add(new FolderInfo(i.ToString(), d.Name, rootF, i, "disclabel" + labelA, DirSize(d), "", "Mappa", d.CreationTime.ToString(), d.LastWriteTime.ToString(), d.FullName));
                 Console.WriteLine(flder[Convert.ToInt32(i)].Id());
 
                 TreeNode[] tempnode = treeView1.Nodes.Find(rootF, true);
@@ -116,7 +116,7 @@ namespace Disc_Catalog
 
                 cmd2.ExecuteNonQuery();
 
-                filnfo.Add(new FileInfo("file" + fileIndex.ToString(), fi.Name, rootF, fileIndex, "disclabel" + labelA, fi.Length, "", fi.Extension, fi.CreationTime.ToString(), fi.LastWriteTime.ToString(), fi.FullName));
+                filnfo.Add(new FilesInfo("file" + fileIndex.ToString(), fi.Name, rootF, fileIndex, "disclabel" + labelA, fi.Length, "", fi.Extension, fi.CreationTime.ToString(), fi.LastWriteTime.ToString(), fi.FullName));
                 TreeNode[] tempnode = treeView1.Nodes.Find(rootF, true);
                 tempnode[0].Nodes.Add("file" + fileIndex.ToString(), fi.Name);
                 fileIndex++;
@@ -124,6 +124,26 @@ namespace Disc_Catalog
             }
             con.Close();
             con2.Close();
+
+
+        }
+
+        public static long DirSize(DirectoryInfo d)
+        {
+            long size = 0;
+            // Add file sizes.
+            FileInfo[] fis = d.GetFiles();
+            foreach (FileInfo fi in fis)
+            {
+                size += fi.Length;
+            }
+            // Add subdirectory sizes.
+            DirectoryInfo[] dis = d.GetDirectories();
+            foreach (DirectoryInfo di in dis)
+            {
+                size += DirSize(di);
+            }
+            return size;
         }
 
         void driveInsertEvent(object sender, EventArrivedEventArgs e)
@@ -149,15 +169,16 @@ namespace Disc_Catalog
             con.Open();
             var cmd = new SQLiteCommand(con);
             drive();
-            cmd.CommandText = "INSERT INTO LabelInfo(`id`, `labelnum`, `labelname`, `labelkey`) VALUES(@id, @labelnum, @labelname, @labelkey)";
+            cmd.CommandText = "INSERT INTO LabelInfo(`id`, `key` , `name` , `label` , `parent` , `size` , `description` , `serial` , `type` , `filesystem`) VALUES(@id, @key , @name , @label , @parent , @size , @description , @serial , @type , @filesystem)";
             cmd.Parameters.AddWithValue("@id", labelA);
-            cmd.Parameters.AddWithValue("@labelnum", labelA);
-            cmd.Parameters.AddWithValue("@labelname", textBox1.Text);
-            cmd.Parameters.AddWithValue("@labelkey", "disclabel" + labelA);
+            cmd.Parameters.AddWithValue("@key", labelA);
+            cmd.Parameters.AddWithValue("@name", textBox1.Text);
+            cmd.Parameters.AddWithValue("@label", "disclabel" + labelA);
 
             cmd.ExecuteNonQuery();
             con.Close();
-           
+
+            
             treeView1.Nodes.Add("disclabel" + labelA, textBox1.Text);
 
             selected = "disclabel" + labelA;
@@ -294,7 +315,7 @@ namespace Disc_Catalog
                     while (reader.Read())
                     {
 
-                        filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
+                        filnfo.Add(new FilesInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                         TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -346,7 +367,7 @@ namespace Disc_Catalog
                             TempInfo.Add(tmpfolder2);
                             ListViewItem ls = new ListViewItem(tmpfolder2.Name());
                             ls.SubItems.Add("ez");
-                            ls.SubItems.Add(tmpfolder2.Size().ToString());
+                            ls.SubItems.Add(sizecalculate(tmpfolder2.Size()));
                             ls.SubItems.Add(tmpfolder2.Attr());
                             ls.SubItems.Add(tmpfolder2.Mdfdate());
                             listView1.Items.Add(ls);
@@ -503,7 +524,7 @@ namespace Disc_Catalog
                 while (reader.Read())
                 {
 
-                    filnfo.Add(new FileInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
+                    filnfo.Add(new FilesInfo(reader.GetInt64(0).ToString(), reader.GetString(1), reader.GetString(2), ((ulong)reader.GetInt64(0)), reader.GetString(3), (long)reader.GetInt64(4), reader.GetString(5), reader.GetString(6), reader.GetString(7), reader.GetString(8), reader.GetString(9)));
                     TreeNode[] tempnode = treeView1.Nodes.Find(reader.GetString(2), true);
 
 
@@ -530,7 +551,7 @@ namespace Disc_Catalog
             name TEXT, parent TEXT, labelinfo TEXT, size BIGINT, description TEXT, attr TEXT, crtdate TEXT, mdfdate TEXT, fullpath TEXT)";
             cmd.ExecuteNonQuery();
             cmd.CommandText = @"CREATE TABLE LabelInfo(id INT PRIMARY KEY,
-            labelnum TEXT, labelname TEXT, labelkey TEXT)";
+            key TEXT, name TEXT, label TEXT, parent TEXT, size BIGINT, description TEXT, serial TEXT, type TEXT, filesystem TEXT)";
             cmd.ExecuteNonQuery();
             con.Close();
         }
